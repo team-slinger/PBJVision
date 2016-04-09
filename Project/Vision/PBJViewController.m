@@ -65,7 +65,7 @@
 {
     PBJStrobeView *_strobeView;
     UIButton *_doneButton;
-    
+
     UIButton *_flipButton;
     UIButton *_focusButton;
     UIButton *_frameRateButton;
@@ -76,13 +76,13 @@
     AVCaptureVideoPreviewLayer *_previewLayer;
     PBJFocusView *_focusView;
     GLKViewController *_effectsViewController;
-    
+
     UILabel *_instructionLabel;
     UIView *_gestureView;
     UILongPressGestureRecognizer *_longPressGestureRecognizer;
     UITapGestureRecognizer *_focusTapGestureRecognizer;
     UITapGestureRecognizer *_photoTapGestureRecognizer;
-    
+
     BOOL _recording;
 
     ALAssetsLibrary *_assetLibrary;
@@ -121,7 +121,7 @@
     self.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
 
     _assetLibrary = [[ALAssetsLibrary alloc] init];
-    
+
     CGFloat viewWidth = CGRectGetWidth(self.view.frame);
 
     // elapsed time and red dot
@@ -148,11 +148,11 @@
     _previewLayer.frame = _previewView.bounds;
     _previewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
     [_previewView.layer addSublayer:_previewLayer];
-    
+
     // onion skin
     _effectsViewController = [[GLKViewController alloc] init];
     _effectsViewController.preferredFramesPerSecond = 60;
-    
+
     GLKView *view = (GLKView *)_effectsViewController.view;
     CGRect viewFrame = _previewView.bounds;
     view.frame = viewFrame;
@@ -178,20 +178,20 @@
     labelCenter.y += ((CGRectGetHeight(_previewView.frame) * 0.5f) + 35.0f);
     _instructionLabel.center = labelCenter;
     [self.view addSubview:_instructionLabel];
-    
+
     // touch to record
     _longPressGestureRecognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(_handleLongPressGestureRecognizer:)];
     _longPressGestureRecognizer.delegate = self;
     _longPressGestureRecognizer.minimumPressDuration = 0.05f;
     _longPressGestureRecognizer.allowableMovement = 10.0f;
-    
+
     // tap to focus
     _focusTapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(_handleFocusTapGesterRecognizer:)];
     _focusTapGestureRecognizer.delegate = self;
     _focusTapGestureRecognizer.numberOfTapsRequired = 1;
     _focusTapGestureRecognizer.enabled = NO;
     [_previewView addGestureRecognizer:_focusTapGestureRecognizer];
-    
+
     // gesture view to record
     _gestureView = [[UIView alloc] initWithFrame:CGRectZero];
     CGRect gestureFrame = self.view.bounds;
@@ -199,7 +199,7 @@
     gestureFrame.size.height -= (40.0f + 85.0f);
     _gestureView.frame = gestureFrame;
     [self.view addSubview:_gestureView];
-    
+
     [_gestureView addGestureRecognizer:_longPressGestureRecognizer];
 
     // bottom dock
@@ -207,7 +207,7 @@
     _captureDock.backgroundColor = [UIColor clearColor];
     _captureDock.autoresizingMask = UIViewAutoresizingFlexibleTopMargin;
     [self.view addSubview:_captureDock];
-    
+
     // flip button
     _flipButton = [ExtendedHitButton extendedHitButton];
     UIImage *flipImage = [UIImage imageNamed:@"capture_flip"];
@@ -218,7 +218,7 @@
     _flipButton.frame = flipFrame;
     [_flipButton addTarget:self action:@selector(_handleFlipButton:) forControlEvents:UIControlEventTouchUpInside];
     [_captureDock addSubview:_flipButton];
-    
+
     // focus mode button
     _focusButton = [ExtendedHitButton extendedHitButton];
     UIImage *focusImage = [UIImage imageNamed:@"capture_focus_button"];
@@ -230,11 +230,11 @@
     _focusButton.frame = focusFrame;
     [_focusButton addTarget:self action:@selector(_handleFocusButton:) forControlEvents:UIControlEventTouchUpInside];
     [_captureDock addSubview:_focusButton];
-    
+
     if ([[PBJVision sharedInstance] supportsVideoFrameRate:120]) {
         // set faster frame rate
     }
-    
+
     // onion button
     _onionButton = [ExtendedHitButton extendedHitButton];
     UIImage *onionImage = [UIImage imageNamed:@"capture_onion"];
@@ -255,7 +255,7 @@
 
     // iOS 6 support
     [[UIApplication sharedApplication] setStatusBarHidden:YES withAnimation:UIStatusBarAnimationSlide];
-    
+
     [self _resetCapture];
     [[PBJVision sharedInstance] startPreview];
 }
@@ -263,9 +263,9 @@
 - (void)viewWillDisappear:(BOOL)animated
 {
     [super viewWillDisappear:animated];
-    
+
     [[PBJVision sharedInstance] stopPreview];
-    
+
     // iOS 6 support
     [[UIApplication sharedApplication] setStatusBarHidden:NO withAnimation:UIStatusBarAnimationSlide];
 }
@@ -303,7 +303,7 @@
         _instructionLabel.transform = CGAffineTransformMakeTranslation(0, 10.0f);
     } completion:^(BOOL finished) {
     }];
-    
+
     [[PBJVision sharedInstance] resumeVideoCapture];
     _effectsViewController.view.hidden = YES;
 }
@@ -311,7 +311,7 @@
 - (void)_endCapture
 {
     [UIApplication sharedApplication].idleTimerDisabled = NO;
-    [[PBJVision sharedInstance] endVideoCapture];
+    [[PBJVision sharedInstance] endVideoCaptureWithCompletion:nil];
     _effectsViewController.view.hidden = YES;
 }
 
@@ -330,7 +330,7 @@
         vision.cameraDevice = PBJCameraDeviceFront;
         _flipButton.hidden = YES;
     }
-    
+
     vision.cameraMode = PBJCameraModeVideo;
     //vision.cameraMode = PBJCameraModePhoto; // PHOTO: uncomment to test photo capture
     vision.cameraOrientation = PBJCameraOrientationPortrait;
@@ -338,7 +338,7 @@
     vision.outputFormat = PBJOutputFormatSquare;
     vision.videoRenderingEnabled = YES;
     vision.additionalCompressionProperties = @{AVVideoProfileLevelKey : AVVideoProfileLevelH264Baseline30}; // AVVideoProfileLevelKey requires specific captureSessionPreset
-    
+
     // specify a maximum duration with the following property
     // vision.maximumCaptureDuration = CMTimeMakeWithSeconds(5, 600); // ~ 5 seconds
 }
@@ -354,7 +354,7 @@
 - (void)_handleFocusButton:(UIButton *)button
 {
     _focusButton.selected = !_focusButton.selected;
-    
+
     if (_focusButton.selected) {
         _focusTapGestureRecognizer.enabled = YES;
         _gestureView.hidden = YES;
@@ -366,7 +366,7 @@
         _focusTapGestureRecognizer.enabled = NO;
         _gestureView.hidden = NO;
     }
-    
+
     [UIView animateWithDuration:0.15f delay:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
         _instructionLabel.alpha = 0;
     } completion:^(BOOL finished) {
@@ -386,7 +386,7 @@
 - (void)_handleOnionSkinningButton:(UIButton *)button
 {
     _onionButton.selected = !_onionButton.selected;
-    
+
     if (_recording) {
         _effectsViewController.view.hidden = !_onionButton.selected;
     }
@@ -397,7 +397,7 @@
     // resets long press
     _longPressGestureRecognizer.enabled = NO;
     _longPressGestureRecognizer.enabled = YES;
-    
+
     [self _endCapture];
 }
 
@@ -445,7 +445,7 @@
 
     // auto focus is occuring, display focus view
     CGPoint point = tapPoint;
-    
+
     CGRect focusFrame = _focusView.frame;
 #if defined(__LP64__) && __LP64__
     focusFrame.origin.x = rint(point.x - (focusFrame.size.width * 0.5));
@@ -455,7 +455,7 @@
     focusFrame.origin.y = rintf(point.y - (focusFrame.size.height * 0.5f));
 #endif
     [_focusView setFrame:focusFrame];
-    
+
     [_previewView addSubview:_focusView];
     [_focusView startAnimation];
 
@@ -489,7 +489,7 @@
 - (void)visionSessionDidStartPreview:(PBJVision *)vision
 {
     NSLog(@"Camera preview did start");
-    
+
 }
 
 - (void)visionSessionDidStopPreview:(PBJVision *)vision
@@ -585,7 +585,7 @@
         return;
     }
     _currentPhoto = photoDict;
-    
+
     // save to library
     NSData *photoData = _currentPhoto[PBJVisionPhotoJPEGKey];
     NSDictionary *metadata = _currentPhoto[PBJVisionPhotoMetadataKey];
@@ -594,7 +594,7 @@
             // handle error properly
             return;
         }
-       
+
         NSString *albumName = @"PBJVision";
         __block BOOL albumFound = NO;
         [_assetLibrary enumerateGroupsWithTypes:ALAssetsGroupAlbum usingBlock:^(ALAssetsGroup *group, BOOL *stop) {
@@ -624,7 +624,7 @@
             }
         } failureBlock:nil];
     }];
-    
+
     _currentPhoto = nil;
 }
 
@@ -659,7 +659,7 @@
     }
 
     _currentVideo = videoDict;
-    
+
     NSString *videoPath = [_currentVideo  objectForKey:PBJVisionVideoPathKey];
     [_assetLibrary writeVideoAtPathToSavedPhotosAlbum:[NSURL URLWithString:videoPath] completionBlock:^(NSURL *assetURL, NSError *error1) {
         UIAlertView *alert = [[UIAlertView alloc] initWithTitle: @"Video Saved!" message: @"Saved to the camera roll."

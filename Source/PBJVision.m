@@ -2189,7 +2189,7 @@ typedef void (^PBJVisionBlock)();
         if (CMTIME_IS_VALID(currentCaptureDuration)) {
             if (CMTIME_COMPARE_INLINE(currentCaptureDuration, >=, _maximumCaptureDuration)) {
                 [self _enqueueBlockOnMainQueue:^{
-                    [self endVideoCapture];
+                    [self endVideoCaptureWithCompletion:nil];
                 }];
             }
         }
@@ -2423,7 +2423,7 @@ typedef void (^PBJVisionBlock)();
         DLog(@"session was stopped");
 
         if (_flags.recording)
-            [self endVideoCapture];
+            [self endVideoCaptureWithCompletion:nil];
 
         [self _enqueueBlockOnMainQueue:^{
             if ([_delegate respondsToSelector:@selector(visionSessionDidStop:)]) {
