@@ -1790,7 +1790,7 @@ typedef void (^PBJVisionBlock)();
     return [self supportsVideoCapture] && [self isCaptureSessionActive] && !_flags.changingModes && isDiskSpaceAvailable;
 }
 
-- (void)startVideoCapture
+- (void)startVideoCaptureWithURL:(NSURL *)url
 {
     if (![self _canSessionCaptureWithOutput:_currentOutput] || _cameraMode != PBJCameraModeVideo) {
         [self _failVideoCaptureWithErrorCode:PBJVisionErrorSessionFailed];
@@ -1805,43 +1805,40 @@ typedef void (^PBJVisionBlock)();
         if (_flags.recording || _flags.paused)
             return;
 
-        NSString *guid = [[NSUUID new] UUIDString];
-        NSString *outputFile = [NSString stringWithFormat:@"video_%@.mp4", guid];
+//        NSString *guid = [[NSUUID new] UUIDString];
+//        NSString *outputFile = [NSString stringWithFormat:@"video_%@.mp4", guid];
 
-        if ([_delegate respondsToSelector:@selector(vision:willStartVideoCaptureToFile:)]) {
-            outputFile = [_delegate vision:self willStartVideoCaptureToFile:outputFile];
+//        if ([_delegate respondsToSelector:@selector(vision:willStartVideoCaptureToFile:)]) {
+//            outputFile = [_delegate vision:self willStartVideoCaptureToFile:outputFile];
+//            if (!outputFile) {
+//                [self _failVideoCaptureWithErrorCode:PBJVisionErrorBadOutputFile];
+//                return;
+//            }
+//        }
 
-            if (!outputFile) {
-                [self _failVideoCaptureWithErrorCode:PBJVisionErrorBadOutputFile];
-                return;
-            }
-        }
-
-        NSString *outputDirectory = (_captureDirectory == nil ? NSTemporaryDirectory() : _captureDirectory);
-        NSString *outputPath = [outputDirectory stringByAppendingPathComponent:outputFile];
-        NSURL *outputURL = [NSURL fileURLWithPath:outputPath];
-        if ([[NSFileManager defaultManager] fileExistsAtPath:outputPath]) {
+//        NSString *outputDirectory = (_captureDirectory == nil ? NSTemporaryDirectory() : _captureDirectory);
+//        NSString *outputPath = [outputDirectory stringByAppendingPathComponent:outputFile];
+//        NSURL *outputURL = [NSURL fileURLWithPath:outputPath];
+        if ([[NSFileManager defaultManager] fileExistsAtPath:url.absoluteString]) {
             NSError *error = nil;
-            if (![[NSFileManager defaultManager] removeItemAtPath:outputPath error:&error]) {
-                [self _failVideoCaptureWithErrorCode:PBJVisionErrorOutputFileExists];
-
-                DLog(@"could not setup an output file (file exists)");
-                return;
+            if (![[NSFileManager defaultManager] removeItemAtPath:url.absoluteString error:&error]) {
+//                [self _failVideoCaptureWithErrorCode:PBJVisionErrorOutputFileExists];
+//                DLog(@"could not setup an output file (file exists)");
+//                return;
             }
         }
 
-        if (!outputPath || [outputPath length] == 0) {
-            [self _failVideoCaptureWithErrorCode:PBJVisionErrorBadOutputFile];
-
-            DLog(@"could not setup an output file");
-            return;
-        }
+//        if (!outputPath || [outputPath length] == 0) {
+//            [self _failVideoCaptureWithErrorCode:PBJVisionErrorBadOutputFile];
+//            DLog(@"could not setup an output file");
+//            return;
+//        }
 
         if (_mediaWriter) {
             _mediaWriter.delegate = nil;
             _mediaWriter = nil;
         }
-        _mediaWriter = [[PBJMediaWriter alloc] initWithOutputURL:outputURL];
+        _mediaWriter = [[PBJMediaWriter alloc] initWithOutputURL:url];
         _mediaWriter.delegate = self;
 
         AVCaptureConnection *videoConnection = [_captureOutputVideo connectionWithMediaType:AVMediaTypeVideo];
