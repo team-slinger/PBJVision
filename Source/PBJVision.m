@@ -32,6 +32,7 @@
 #import <ImageIO/ImageIO.h>
 #import <OpenGLES/EAGL.h>
 #import <UIKit/UIKit.h>
+#import <CoreMedia/CoreMedia.h>
 
 #define LOG_VISION 1
 #ifndef DLog
@@ -2135,6 +2136,12 @@ typedef void (^PBJVisionBlock)();
         {
             videoDimensions.width = dimensions.width;
             videoDimensions.height = (int32_t)(dimensions.width * 9 / 16.0f);
+            break;
+        }
+        case PBJOutputFormatVertical:
+        {
+            videoDimensions.width = dimensions.height;
+            videoDimensions.height = (int32_t)(dimensions.height * 0.5625);
             break;
         }
         case PBJOutputFormatStandard:
