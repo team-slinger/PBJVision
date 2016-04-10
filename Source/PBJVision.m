@@ -2077,9 +2077,9 @@ typedef void (^PBJVisionBlock)();
     CVPixelBufferLockBaseAddress(imageBuffer,0);        // Lock the image buffer
 
     uint8_t *baseAddress = (uint8_t *)CVPixelBufferGetBaseAddressOfPlane(imageBuffer, 0);   // Get information of the image
-    size_t bytesPerRow = CVPixelBufferGetBytesPerRow(imageBuffer);
     size_t width = CVPixelBufferGetWidth(imageBuffer);
     size_t height = CVPixelBufferGetHeight(imageBuffer);
+    size_t bytesPerRow = width*4;
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
 
     CGContextRef newContext = CGBitmapContextCreate(baseAddress, width, height, 8, bytesPerRow, colorSpace, kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
