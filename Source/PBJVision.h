@@ -241,10 +241,12 @@ static CGFloat const PBJVideoBitRate1280x750 = 5000000 * 8;
 
 @property (nonatomic) BOOL thumbnailEnabled; // thumbnail generation, disabling reduces processing time for a photo or video
 @property (nonatomic) BOOL defaultVideoThumbnails; // capture first and last frames of video
+@property (nonatomic) CMSampleBufferRef lastFrameBuffer;
 
 - (void)captureCurrentVideoThumbnail;
 - (void)captureVideoThumbnailAtFrame:(int64_t)frame;
 - (void)captureVideoThumbnailAtTime:(Float64)seconds;
+- (UIImage *)thumbnailFromSampleBuffer:(CMSampleBufferRef)sampleBufferRef;
 
 @end
 

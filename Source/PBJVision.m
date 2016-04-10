@@ -2072,6 +2072,26 @@ typedef void (^PBJVisionBlock)();
     }
 }
 
+- (UIImage *)thumbnailFromSampleBuffer:(CMSampleBufferRef)sampleBufferRef {
+    CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBufferRef);
+    CVPixelBufferLockBaseAddress(imageBuffer,0);        // Lock the image buffer
+
+    uint8_t *baseAddress = (uint8_t *)CVPixelBufferGetBaseAddressOfPlane(imageBuffer, 0);   // Get information of the image
+    size_t bytesPerRow = CVPixelBufferGetBytesPerRow(imageBuffer);
+    size_t width = CVPixelBufferGetWidth(imageBuffer);
+    size_t height = CVPixelBufferGetHeight(imageBuffer);
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+
+    CGContextRef newContext = CGBitmapContextCreate(baseAddress, width, height, 8, bytesPerRow, colorSpace, kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
+    CGImageRef newImage = CGBitmapContextCreateImage(newContext);
+    CGContextRelease(newContext);
+
+    CGColorSpaceRelease(colorSpace);
+    CVPixelBufferUnlockBaseAddress(imageBuffer,0);
+    /* CVBufferRelease(imageBuffer); */  // do not call this!
+    return [UIImage imageWithCGImage:newImage];
+}
+
 - (void)_failVideoCaptureWithErrorCode:(NSInteger)errorCode
 {
     if (errorCode && [_delegate respondsToSelector:@selector(vision:capturedVideo:error:)]) {
@@ -2272,6 +2292,11 @@ typedef void (^PBJVisionBlock)();
     if (bufferToWrite && !_flags.interrupted) {
 
         if (isVideo) {
+            //copy last buffer in case needed for live thumbnail
+            CFAllocatorRef allocator = CFAllocatorGetDefault();
+            CMSampleBufferRef sbufCopyOut;
+            CMSampleBufferCreateCopy(allocator,bufferToWrite,&sbufCopyOut);
+            self.lastFrameBuffer = sbufCopyOut;
 
             [_mediaWriter writeSampleBuffer:bufferToWrite withMediaTypeVideo:isVideo];
 
