@@ -534,34 +534,37 @@ typedef NS_ENUM(GLint, PBJVisionUniformLocationTypes)
 
     NSError *error = nil;
     if (_currentDevice && [_currentDevice lockForConfiguration:&error]) {
-
-        switch (_cameraMode) {
-            case PBJCameraModePhoto:
-            {
-                if ([_currentDevice isFlashModeSupported:(AVCaptureFlashMode)_flashMode]) {
-                    [_currentDevice setFlashMode:(AVCaptureFlashMode)_flashMode];
-                }
-                break;
-            }
-            case PBJCameraModeVideo:
-            {
-                if ([_currentDevice isFlashModeSupported:(AVCaptureFlashMode)_flashMode]) {
-                    [_currentDevice setFlashMode:AVCaptureFlashModeOff];
-                }
-
-                if ([_currentDevice isTorchModeSupported:(AVCaptureTorchMode)_flashMode]) {
-                    [_currentDevice setTorchMode:(AVCaptureTorchMode)_flashMode];
-                }
-                break;
-            }
-            default:
-                break;
+        if ([_currentDevice isFlashModeSupported:(AVCaptureFlashMode)_flashMode]) {
+            [_currentDevice setFlashMode:(AVCaptureFlashMode)_flashMode];
         }
-
         [_currentDevice unlockForConfiguration];
 
     } else if (error) {
         DLog(@"error locking device for flash mode change (%@)", error);
+    }
+}
+
+- (BOOL)isTorchAvailable
+{
+    return (_currentDevice && [_currentDevice hasTorch]);
+}
+
+- (void)setTorchMode:(PBJTorchMode)torchMode
+{
+    BOOL shouldChangeTorchMode = (_torchMode != torchMode);
+    if (![_currentDevice hasTorch] || !shouldChangeTorchMode)
+        return;
+
+    _torchMode = torchMode;
+
+    NSError *error = nil;
+    if (_currentDevice && [_currentDevice lockForConfiguration:&error]) {
+        if ([_currentDevice isTorchModeSupported:(AVCaptureTorchMode)_torchMode]) {
+            [_currentDevice setTorchMode:(AVCaptureTorchMode)_torchMode];
+        }
+        [_currentDevice unlockForConfiguration];
+    } else if (error) {
+        DLog(@"error locking device for torch mode change (%@)", error);
     }
 }
 
