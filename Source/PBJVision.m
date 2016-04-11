@@ -553,8 +553,8 @@ typedef NS_ENUM(GLint, PBJVisionUniformLocationTypes)
 {
     NSError *error = nil;
     if (_currentDevice && [_currentDevice lockForConfiguration:&error]) {
-        if ([_currentDevice isTorchModeSupported:(AVCaptureTorchMode)_torchMode]) {
-            [_currentDevice setTorchMode:(AVCaptureTorchMode)_torchMode];
+        if ([_currentDevice isTorchModeSupported:(AVCaptureTorchMode)enabled]) {
+            [_currentDevice setTorchMode:(AVCaptureTorchMode)enabled];
         }
         [_currentDevice unlockForConfiguration];
         [_captureSession commitConfiguration];
