@@ -538,7 +538,7 @@ typedef NS_ENUM(GLint, PBJVisionUniformLocationTypes)
             [_currentDevice setFlashMode:(AVCaptureFlashMode)_flashMode];
         }
         [_currentDevice unlockForConfiguration];
-
+        [_captureSession commitConfiguration];
     } else if (error) {
         DLog(@"error locking device for flash mode change (%@)", error);
     }
@@ -549,20 +549,15 @@ typedef NS_ENUM(GLint, PBJVisionUniformLocationTypes)
     return (_currentDevice && [_currentDevice hasTorch]);
 }
 
-- (void)setTorchMode:(PBJTorchMode)torchMode
+- (void)enableTorch:(BOOL)enabled
 {
-    BOOL shouldChangeTorchMode = (_torchMode != torchMode);
-    if (![_currentDevice hasTorch] || !shouldChangeTorchMode)
-        return;
-
-    _torchMode = torchMode;
-
     NSError *error = nil;
     if (_currentDevice && [_currentDevice lockForConfiguration:&error]) {
         if ([_currentDevice isTorchModeSupported:(AVCaptureTorchMode)_torchMode]) {
             [_currentDevice setTorchMode:(AVCaptureTorchMode)_torchMode];
         }
         [_currentDevice unlockForConfiguration];
+        [_captureSession commitConfiguration];
     } else if (error) {
         DLog(@"error locking device for torch mode change (%@)", error);
     }
@@ -1850,34 +1845,15 @@ typedef void (^PBJVisionBlock)();
         if (_flags.recording || _flags.paused)
             return;
 
-//        NSString *guid = [[NSUUID new] UUIDString];
-//        NSString *outputFile = [NSString stringWithFormat:@"video_%@.mp4", guid];
+        if (self.torchMode == PBJTorchModeOn) {
+            [self enableTorch:YES];
+        }
 
-//        if ([_delegate respondsToSelector:@selector(vision:willStartVideoCaptureToFile:)]) {
-//            outputFile = [_delegate vision:self willStartVideoCaptureToFile:outputFile];
-//            if (!outputFile) {
-//                [self _failVideoCaptureWithErrorCode:PBJVisionErrorBadOutputFile];
-//                return;
-//            }
-//        }
-
-//        NSString *outputDirectory = (_captureDirectory == nil ? NSTemporaryDirectory() : _captureDirectory);
-//        NSString *outputPath = [outputDirectory stringByAppendingPathComponent:outputFile];
-//        NSURL *outputURL = [NSURL fileURLWithPath:outputPath];
         if ([[NSFileManager defaultManager] fileExistsAtPath:url.absoluteString]) {
             NSError *error = nil;
             if (![[NSFileManager defaultManager] removeItemAtPath:url.absoluteString error:&error]) {
-//                [self _failVideoCaptureWithErrorCode:PBJVisionErrorOutputFileExists];
-//                DLog(@"could not setup an output file (file exists)");
-//                return;
             }
         }
-
-//        if (!outputPath || [outputPath length] == 0) {
-//            [self _failVideoCaptureWithErrorCode:PBJVisionErrorBadOutputFile];
-//            DLog(@"could not setup an output file");
-//            return;
-//        }
 
         if (_mediaWriter) {
             _mediaWriter.delegate = nil;
@@ -1961,6 +1937,9 @@ typedef void (^PBJVisionBlock)();
     DLog(@"ending video capture");
 
     [self _enqueueBlockOnCaptureVideoQueue:^{
+
+        [self enableTorch:NO];
+
         if (!_flags.recording)
             return;
 
