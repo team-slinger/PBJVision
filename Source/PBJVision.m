@@ -1938,8 +1938,6 @@ typedef void (^PBJVisionBlock)();
 
     [self _enqueueBlockOnCaptureVideoQueue:^{
 
-        [self enableTorch:NO];
-
         if (!_flags.recording)
             return;
 
@@ -1982,6 +1980,8 @@ typedef void (^PBJVisionBlock)();
                 if ([_delegate respondsToSelector:@selector(vision:capturedVideo:error:)]) {
                     [_delegate vision:self capturedVideo:videoDict error:error];
                 }
+
+                [self enableTorch:NO];
 
                 if (completion) {
                     completion(videoDict, error);
