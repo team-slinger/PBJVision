@@ -123,6 +123,7 @@ typedef NS_ENUM(GLint, PBJVisionUniformLocationTypes)
     BOOL _autoUpdatePreviewOrientation;
     BOOL _autoFreezePreviewDuringCapture;
     BOOL _usesApplicationAudioSession;
+    BOOL _firstVideoFrameRecorded;
 
     PBJFocusMode _focusMode;
     PBJExposureMode _exposureMode;
@@ -437,72 +438,72 @@ typedef NS_ENUM(GLint, PBJVisionUniformLocationTypes)
 }
 
 - (void)setCameraDeviceAfterInitialSetup:(PBJCameraDevice)cameraDevice {
-    if (cameraDevice == self.cameraDevice || !_captureSession) {
-        return;
-    }
+    [self _enqueueBlockOnCaptureVideoQueue:^{
+        if (cameraDevice == self.cameraDevice || !_captureSession) {
+            return;
+        }
 
-    _cameraDevice = cameraDevice;
+        _cameraDevice = cameraDevice;
 
-    if (cameraDevice == PBJCameraDeviceBack && ![self.class isRearCameraAvailable]) {
-        return;
-    }
+        if (cameraDevice == PBJCameraDeviceBack && ![self.class isRearCameraAvailable]) {
+            return;
+        }
 
-    if (cameraDevice == PBJCameraDeviceFront && ![self.class isFrontCameraAvailable]) {
-        return;
-    }
+        if (cameraDevice == PBJCameraDeviceFront && ![self.class isFrontCameraAvailable]) {
+            return;
+        }
 
-    if ([_delegate respondsToSelector:@selector(visionCameraDeviceWillChange:)]) {
-        [_delegate performSelector:@selector(visionCameraDeviceWillChange:) withObject:self];
-    }
+        if ([_delegate respondsToSelector:@selector(visionCameraDeviceWillChange:)]) {
+            [_delegate performSelector:@selector(visionCameraDeviceWillChange:) withObject:self];
+        }
 
-    AVCaptureDeviceInput *newDeviceInput = nil;
+        AVCaptureDeviceInput *newDeviceInput = nil;
 
-    [_captureSession beginConfiguration];
+        [_captureSession beginConfiguration];
 
-    switch (_cameraDevice) {
-        case PBJCameraDeviceFront: {
-            if (_captureDeviceInputBack)
-                [_captureSession removeInput:_captureDeviceInputBack];
+        switch (_cameraDevice) {
+            case PBJCameraDeviceFront: {
+                if (_captureDeviceInputBack)
+                    [_captureSession removeInput:_captureDeviceInputBack];
 
-            if (_captureDeviceInputFront && [_captureSession canAddInput:_captureDeviceInputFront]) {
-                [_captureSession addInput:_captureDeviceInputFront];
-                newDeviceInput = _captureDeviceInputFront;
+                NSError *error = nil;
+                _captureDeviceInputFront = [AVCaptureDeviceInput deviceInputWithDevice:_captureDeviceFront error:&error];
+
+                if (_captureDeviceInputFront && [_captureSession canAddInput:_captureDeviceInputFront]) {
+                    [_captureSession addInput:_captureDeviceInputFront];
+                    newDeviceInput = _captureDeviceInputFront;
+                }
+                break;
             }
-            break;
-        }
-        case PBJCameraDeviceBack: {
-            if (_captureDeviceInputFront)
-                [_captureSession removeInput:_captureDeviceInputFront];
+            case PBJCameraDeviceBack: {
+                if (_captureDeviceInputFront)
+                    [_captureSession removeInput:_captureDeviceInputFront];
 
-            if (_captureDeviceInputBack && [_captureSession canAddInput:_captureDeviceInputBack]) {
-                [_captureSession addInput:_captureDeviceInputBack];
-                newDeviceInput = _captureDeviceInputBack;
+                NSError *error = nil;
+                _captureDeviceInputBack = [AVCaptureDeviceInput deviceInputWithDevice:_captureDeviceBack error:&error];
+
+                if (_captureDeviceInputBack && [_captureSession canAddInput:_captureDeviceInputBack]) {
+                    [_captureSession addInput:_captureDeviceInputBack];
+                    newDeviceInput = _captureDeviceInputBack;
+                }
+                break;
             }
-            break;
+            default:
+                break;
         }
-        default:
-            break;
-    }
 
-    if (newDeviceInput)
-        _currentInput = newDeviceInput;
+        if (newDeviceInput)
+            _currentInput = newDeviceInput;
 
-    if (_currentInput) {
-        AVCaptureDevice *device = [_currentInput device];
-        if (device) {
-            [self willChangeValueForKey:@"currentDevice"];
-            [self _setCurrentDevice:device];
-            [self didChangeValueForKey:@"currentDevice"];
+        AVCaptureConnection *videoConnection = [_captureOutputVideo connectionWithMediaType:AVMediaTypeVideo];
+        [self _setOrientationForConnection:videoConnection];
+
+        [_captureSession commitConfiguration];
+
+        if ([_delegate respondsToSelector:@selector(visionCameraDeviceDidChange:)]) {
+            [_delegate performSelector:@selector(visionCameraDeviceDidChange:) withObject:self];
         }
-    }
-
-    [_captureSession commitConfiguration];
-
-    [self setMirroringMode:_mirroringMode];
-
-    if ([_delegate respondsToSelector:@selector(visionCameraDeviceDidChange:)]) {
-        [_delegate performSelector:@selector(visionCameraDeviceDidChange:) withObject:self];
-    }
+    }];
 }
 
 + (BOOL)isFrontCameraAvailable
@@ -1919,7 +1920,6 @@ typedef void (^PBJVisionBlock)();
     DLog(@"starting video capture");
 
     [self _enqueueBlockOnCaptureVideoQueue:^{
-
         if (_flags.recording || _flags.paused)
             return;
 
@@ -1939,9 +1939,6 @@ typedef void (^PBJVisionBlock)();
         }
         _mediaWriter = [[PBJMediaWriter alloc] initWithOutputURL:url];
         _mediaWriter.delegate = self;
-
-        AVCaptureConnection *videoConnection = [_captureOutputVideo connectionWithMediaType:AVMediaTypeVideo];
-        [self _setOrientationForConnection:videoConnection];
 
         _startTimestamp = CMClockGetTime(CMClockGetHostTimeClock());
         _timeOffset = kCMTimeInvalid;
@@ -2026,6 +2023,7 @@ typedef void (^PBJVisionBlock)();
 
         _flags.recording = NO;
         _flags.paused = NO;
+        _firstVideoFrameRecorded = NO;
 
         void (^finishWritingCompletionHandler)(void) = ^{
             Float64 capturedDuration = self.capturedVideoSeconds;
@@ -2319,9 +2317,14 @@ typedef void (^PBJVisionBlock)();
 
     // setup media writer
     BOOL isVideo = (captureOutput == _captureOutputVideo);
+
     if (!isVideo && !_mediaWriter.isAudioReady) {
         [self _setupMediaWriterAudioInputWithSampleBuffer:sampleBuffer];
         DLog(@"ready for audio (%d)", _mediaWriter.isAudioReady);
+    }
+    if (isVideo && !_firstVideoFrameRecorded) {
+        _firstVideoFrameRecorded = YES;
+        return;
     }
     if (isVideo && !_mediaWriter.isVideoReady) {
         [self _setupMediaWriterVideoInputWithSampleBuffer:sampleBuffer];
