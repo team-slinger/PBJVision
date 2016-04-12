@@ -432,9 +432,87 @@ typedef NS_ENUM(GLint, PBJVisionUniformLocationTypes)
     }];
 }
 
-- (void)setCameraDevice:(PBJCameraDevice)cameraDevice
-{
+- (void)setCameraDevice:(PBJCameraDevice)cameraDevice {
     [self _setCameraMode:_cameraMode cameraDevice:cameraDevice outputFormat:_outputFormat];
+}
+
+- (void)setCameraDeviceAfterInitialSetup:(PBJCameraDevice)cameraDevice {
+    if (cameraDevice == self.cameraDevice || !_captureSession) {
+        return;
+    }
+
+    _cameraDevice = cameraDevice;
+
+    if (cameraDevice == PBJCameraDeviceBack && ![self.class isRearCameraAvailable]) {
+        return;
+    }
+
+    if (cameraDevice == PBJCameraDeviceFront && ![self.class isFrontCameraAvailable]) {
+        return;
+    }
+
+    if ([_delegate respondsToSelector:@selector(visionCameraDeviceWillChange:)]) {
+        [_delegate performSelector:@selector(visionCameraDeviceWillChange:) withObject:self];
+    }
+
+    AVCaptureDeviceInput *newDeviceInput = nil;
+
+    [_captureSession beginConfiguration];
+
+    switch (_cameraDevice) {
+        case PBJCameraDeviceFront: {
+            if (_captureDeviceInputBack)
+                [_captureSession removeInput:_captureDeviceInputBack];
+
+            if (_captureDeviceInputFront && [_captureSession canAddInput:_captureDeviceInputFront]) {
+                [_captureSession addInput:_captureDeviceInputFront];
+                newDeviceInput = _captureDeviceInputFront;
+            }
+            break;
+        }
+        case PBJCameraDeviceBack: {
+            if (_captureDeviceInputFront)
+                [_captureSession removeInput:_captureDeviceInputFront];
+
+            if (_captureDeviceInputBack && [_captureSession canAddInput:_captureDeviceInputBack]) {
+                [_captureSession addInput:_captureDeviceInputBack];
+                newDeviceInput = _captureDeviceInputBack;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+
+    if (newDeviceInput)
+        _currentInput = newDeviceInput;
+
+    if (_currentInput) {
+        AVCaptureDevice *device = [_currentInput device];
+        if (device) {
+            [self willChangeValueForKey:@"currentDevice"];
+            [self _setCurrentDevice:device];
+            [self didChangeValueForKey:@"currentDevice"];
+        }
+    }
+
+    [_captureSession commitConfiguration];
+
+    [self setMirroringMode:_mirroringMode];
+
+    if ([_delegate respondsToSelector:@selector(visionCameraDeviceDidChange:)]) {
+        [_delegate performSelector:@selector(visionCameraDeviceDidChange:) withObject:self];
+    }
+}
+
++ (BOOL)isFrontCameraAvailable
+{
+    return [UIImagePickerController isCameraDeviceAvailable:UIImagePickerControllerCameraDeviceFront];
+}
+
++ (BOOL)isRearCameraAvailable
+{
+    return [UIImagePickerController isCameraDeviceAvailable:UIImagePickerControllerCameraDeviceRear];
 }
 
 - (void)setCaptureSessionPreset:(NSString *)captureSessionPreset
