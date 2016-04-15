@@ -183,6 +183,10 @@ typedef NS_ENUM(GLint, PBJVisionUniformLocationTypes)
         unsigned int defaultVideoThumbnails:1;
         unsigned int videoCaptureFrame:1;
     } __block _flags;
+
+    //screenshot
+    CMSampleBufferRef lastBuffer;
+    CMSampleBufferRef screenshotBuffer;
 }
 
 @property (nonatomic) AVCaptureDevice *currentDevice;
@@ -1778,11 +1782,22 @@ typedef void (^PBJVisionBlock)();
     }];
 }
 
-- (UIImage *)imageFromSampleBuffer:(CMSampleBufferRef)sampleBuffer
-{
-    if (!sampleBuffer) {
+- (BOOL)lastBufferExists {
+    if (lastBuffer) {
+        return YES;
+    } else {
+        return NO;
+    }
+}
+
+- (UIImage *)imageFromLastBuffer {
+    if (!lastBuffer) {
         return nil;
     }
+
+    CMSampleBufferCreateCopy(kCFAllocatorDefault, lastBuffer, &screenshotBuffer);
+    NSLog(@"retain count %i", (int) CFGetRetainCount(screenshotBuffer));
+
     // create associated data
     NSMutableDictionary *photoDict = [[NSMutableDictionary alloc] init];
     NSDictionary *metadata = nil;
@@ -1791,10 +1806,10 @@ typedef void (^PBJVisionBlock)();
     // add any attachments to propagate
     NSDictionary *tiffDict = @{ (NSString *)kCGImagePropertyTIFFSoftware : @"PBJVision",
             (NSString *)kCGImagePropertyTIFFDateTime : [NSString PBJformattedTimestampStringFromDate:[NSDate date]] };
-    CMSetAttachment(sampleBuffer, kCGImagePropertyTIFFDictionary, (__bridge CFTypeRef)(tiffDict), kCMAttachmentMode_ShouldPropagate);
+    CMSetAttachment(screenshotBuffer, kCGImagePropertyTIFFDictionary, (__bridge CFTypeRef)(tiffDict), kCMAttachmentMode_ShouldPropagate);
 
     // add photo metadata (ie EXIF: Aperture, Brightness, Exposure, FocalLength, etc)
-    metadata = (__bridge NSDictionary *)CMCopyDictionaryOfAttachments(kCFAllocatorDefault, sampleBuffer, kCMAttachmentMode_ShouldPropagate);
+    metadata = (__bridge NSDictionary *)CMCopyDictionaryOfAttachments(kCFAllocatorDefault, screenshotBuffer, kCMAttachmentMode_ShouldPropagate);
     if (metadata) {
         photoDict[PBJVisionPhotoMetadataKey] = metadata;
         CFRelease((__bridge CFTypeRef)(metadata));
@@ -1806,7 +1821,7 @@ typedef void (^PBJVisionBlock)();
         _ciContext = [CIContext contextWithEAGLContext:[[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2]];
     }
 
-    CVPixelBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+    CVPixelBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(screenshotBuffer);
     CIImage *ciImage = [CIImage imageWithCVPixelBuffer:pixelBuffer];
 
     CGImageRef cgImage = [_ciContext createCGImage:ciImage fromRect:CGRectMake(0, 0, CVPixelBufferGetWidth(pixelBuffer), CVPixelBufferGetHeight(pixelBuffer))];
@@ -1817,6 +1832,8 @@ typedef void (^PBJVisionBlock)();
     if (cgImage) {
         CFRelease(cgImage);
     }
+    CFRelease(screenshotBuffer);
+
     return uiImage;
 }
 
@@ -2377,11 +2394,10 @@ typedef void (^PBJVisionBlock)();
 
         if (isVideo) {
             //copy last buffer in case needed for live thumbnail
-            if (self.lastBuffer) {
-                CFRelease(self.lastBuffer);
+            if (lastBuffer) {
+                CFRelease(lastBuffer);
             }
-            self.lastBuffer = bufferToWrite;
-            CFRetain(self.lastBuffer);
+            CMSampleBufferCreateCopy(kCFAllocatorDefault, bufferToWrite, &lastBuffer);
 
             [_mediaWriter writeSampleBuffer:bufferToWrite withMediaTypeVideo:isVideo];
 
