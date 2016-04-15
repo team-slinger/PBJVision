@@ -2377,7 +2377,11 @@ typedef void (^PBJVisionBlock)();
 
         if (isVideo) {
             //copy last buffer in case needed for live thumbnail
-            self.lastRecordedImage = [self imageFromSampleBuffer:bufferToWrite];
+            if (self.lastBuffer) {
+                CFRelease(self.lastBuffer);
+            }
+            self.lastBuffer = bufferToWrite;
+            CFRetain(self.lastBuffer);
 
             [_mediaWriter writeSampleBuffer:bufferToWrite withMediaTypeVideo:isVideo];
 
