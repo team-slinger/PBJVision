@@ -183,10 +183,6 @@ typedef NS_ENUM(GLint, PBJVisionUniformLocationTypes)
         unsigned int defaultVideoThumbnails:1;
         unsigned int videoCaptureFrame:1;
     } __block _flags;
-
-    //screenshot
-    CMSampleBufferRef lastBuffer;
-    CMSampleBufferRef screenshotBuffer;
 }
 
 @property (nonatomic) AVCaptureDevice *currentDevice;
@@ -1782,61 +1778,6 @@ typedef void (^PBJVisionBlock)();
     }];
 }
 
-- (BOOL)lastBufferExists {
-    if (lastBuffer) {
-        return YES;
-    } else {
-        return NO;
-    }
-}
-
-- (UIImage *)imageFromLastBuffer {
-    if (!lastBuffer) {
-        return nil;
-    }
-
-    CMSampleBufferCreateCopy(kCFAllocatorDefault, lastBuffer, &screenshotBuffer);
-    NSLog(@"retain count %i", (int) CFGetRetainCount(screenshotBuffer));
-
-    // create associated data
-    NSMutableDictionary *photoDict = [[NSMutableDictionary alloc] init];
-    NSDictionary *metadata = nil;
-    NSError *error = nil;
-
-    // add any attachments to propagate
-    NSDictionary *tiffDict = @{ (NSString *)kCGImagePropertyTIFFSoftware : @"PBJVision",
-            (NSString *)kCGImagePropertyTIFFDateTime : [NSString PBJformattedTimestampStringFromDate:[NSDate date]] };
-    CMSetAttachment(screenshotBuffer, kCGImagePropertyTIFFDictionary, (__bridge CFTypeRef)(tiffDict), kCMAttachmentMode_ShouldPropagate);
-
-    // add photo metadata (ie EXIF: Aperture, Brightness, Exposure, FocalLength, etc)
-    metadata = (__bridge NSDictionary *)CMCopyDictionaryOfAttachments(kCFAllocatorDefault, screenshotBuffer, kCMAttachmentMode_ShouldPropagate);
-    if (metadata) {
-        photoDict[PBJVisionPhotoMetadataKey] = metadata;
-        CFRelease((__bridge CFTypeRef)(metadata));
-    } else {
-        DLog(@"failed to generate metadata for photo");
-    }
-
-    if (!_ciContext) {
-        _ciContext = [CIContext contextWithEAGLContext:[[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2]];
-    }
-
-    CVPixelBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(screenshotBuffer);
-    CIImage *ciImage = [CIImage imageWithCVPixelBuffer:pixelBuffer];
-
-    CGImageRef cgImage = [_ciContext createCGImage:ciImage fromRect:CGRectMake(0, 0, CVPixelBufferGetWidth(pixelBuffer), CVPixelBufferGetHeight(pixelBuffer))];
-
-    // add UIImage
-    UIImage *uiImage = [UIImage imageWithCGImage:cgImage];
-
-    if (cgImage) {
-        CFRelease(cgImage);
-    }
-    CFRelease(screenshotBuffer);
-
-    return uiImage;
-}
-
 - (void)capturePhoto
 {
     if (![self _canSessionCaptureWithOutput:_currentOutput] || _cameraMode != PBJCameraModePhoto) {
@@ -2393,12 +2334,6 @@ typedef void (^PBJVisionBlock)();
     if (bufferToWrite && !_flags.interrupted) {
 
         if (isVideo) {
-            //copy last buffer in case needed for live thumbnail
-            if (lastBuffer) {
-                CFRelease(lastBuffer);
-            }
-            CMSampleBufferCreateCopy(kCFAllocatorDefault, bufferToWrite, &lastBuffer);
-
             [_mediaWriter writeSampleBuffer:bufferToWrite withMediaTypeVideo:isVideo];
 
             _flags.videoWritten = YES;
@@ -2417,11 +2352,9 @@ typedef void (^PBJVisionBlock)();
                 }];
             }
 
-            [self _enqueueBlockOnMainQueue:^{
-                if ([_delegate respondsToSelector:@selector(vision:didCaptureVideoSampleBuffer:)]) {
-                    [_delegate vision:self didCaptureVideoSampleBuffer:bufferToWrite];
-                }
-            }];
+            if ([_delegate respondsToSelector:@selector(vision:didCaptureVideoSampleBuffer:)]) {
+                [_delegate vision:self didCaptureVideoSampleBuffer:bufferToWrite];
+            }
 
         } else if (!isVideo && _flags.videoWritten) {
 
@@ -2434,7 +2367,6 @@ typedef void (^PBJVisionBlock)();
             }];
 
         }
-
     }
 
     [self _automaticallyEndCaptureIfMaximumDurationReachedWithSampleBuffer:sampleBuffer];
