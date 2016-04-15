@@ -166,6 +166,7 @@ static CGFloat const PBJVideoBitRate1280x750 = 5000000 * 8;
 
 @property (nonatomic) PBJTorchMode torchMode; // flash and torch
 @property (nonatomic, readonly, getter=isTorchAvailable) BOOL torchAvailable;
+- (void)toggleFlashlight:(BOOL)toggle;
 
 @property (nonatomic) PBJMirroringMode mirroringMode;
 
