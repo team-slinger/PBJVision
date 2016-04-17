@@ -498,6 +498,7 @@ typedef NS_ENUM(GLint, PBJVisionUniformLocationTypes)
         AVCaptureConnection *videoConnection = [_captureOutputVideo connectionWithMediaType:AVMediaTypeVideo];
         [self _setOrientationForConnection:videoConnection];
 
+        [self setMirroringMode:self.mirroringMode];
         [_captureSession commitConfiguration];
 
         if ([_delegate respondsToSelector:@selector(visionCameraDeviceDidChange:)]) {
@@ -1897,45 +1898,47 @@ typedef void (^PBJVisionBlock)();
 
     DLog(@"starting video capture");
 
-    [self _enqueueBlockOnCaptureVideoQueue:^{
-        if (_flags.recording || _flags.paused)
-            return;
+    [self _enqueueBlockOnMainQueue:^{
+        [self _enqueueBlockOnCaptureVideoQueue:^{
+            if (_flags.recording || _flags.paused)
+                return;
 
-        if (self.torchMode == PBJTorchModeOn) {
-            [self enableTorch:YES];
-        }
-
-        if ([[NSFileManager defaultManager] fileExistsAtPath:url.absoluteString]) {
-            NSError *error = nil;
-            if (![[NSFileManager defaultManager] removeItemAtPath:url.absoluteString error:&error]) {
+            if (self.torchMode == PBJTorchModeOn) {
+                [self enableTorch:YES];
             }
-        }
 
-        if (_mediaWriter) {
-            _mediaWriter.delegate = nil;
-            _mediaWriter = nil;
-        }
-        _mediaWriter = [[PBJMediaWriter alloc] initWithOutputURL:url];
-        _mediaWriter.delegate = self;
+            if ([[NSFileManager defaultManager] fileExistsAtPath:url.absoluteString]) {
+                NSError *error = nil;
+                if (![[NSFileManager defaultManager] removeItemAtPath:url.absoluteString error:&error]) {
+                }
+            }
 
-        _startTimestamp = CMClockGetTime(CMClockGetHostTimeClock());
-        _timeOffset = kCMTimeInvalid;
+            if (_mediaWriter) {
+                _mediaWriter.delegate = nil;
+                _mediaWriter = nil;
+            }
+            _mediaWriter = [[PBJMediaWriter alloc] initWithOutputURL:url];
+            _mediaWriter.delegate = self;
 
-        _flags.recording = YES;
-        _flags.paused = NO;
-        _flags.interrupted = NO;
-        _flags.videoWritten = NO;
+            _startTimestamp = CMClockGetTime(CMClockGetHostTimeClock());
+            _timeOffset = kCMTimeInvalid;
 
-        _captureThumbnailTimes = [NSMutableSet set];
-        _captureThumbnailFrames = [NSMutableSet set];
+            _flags.recording = YES;
+            _flags.paused = NO;
+            _flags.interrupted = NO;
+            _flags.videoWritten = NO;
 
-        if (_flags.thumbnailEnabled && _flags.defaultVideoThumbnails) {
-            [self captureVideoThumbnailAtFrame:0];
-        }
+            _captureThumbnailTimes = [NSMutableSet set];
+            _captureThumbnailFrames = [NSMutableSet set];
 
-        [self _enqueueBlockOnMainQueue:^{
-            if ([_delegate respondsToSelector:@selector(visionDidStartVideoCapture:)])
-                [_delegate visionDidStartVideoCapture:self];
+            if (_flags.thumbnailEnabled && _flags.defaultVideoThumbnails) {
+                [self captureVideoThumbnailAtFrame:0];
+            }
+
+            [self _enqueueBlockOnMainQueue:^{
+                if ([_delegate respondsToSelector:@selector(visionDidStartVideoCapture:)])
+                    [_delegate visionDidStartVideoCapture:self];
+            }];
         }];
     }];
 }
